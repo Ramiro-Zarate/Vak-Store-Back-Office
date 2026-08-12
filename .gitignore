@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+
+# Esquemas de la BD (referencia interna, no se suben)
+Supabase Snippet Estructura de DB.csv
+Supabase Snippet Relaciones de las keys.csv
 
 # Editor directories and files
 .vscode/*

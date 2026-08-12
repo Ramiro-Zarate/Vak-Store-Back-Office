@@ -1,0 +1,37 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.heading {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  max-width: 340px;
+  white-space: normal;
+}
+
+.costCell {
+  width: 140px;
+}
+
+.costCell .input {
+  padding: 6px 10px;
+  font-size: 13.5px;
+}
+
+.actionCell {
+  text-align: right;
+  white-space: nowrap;
+}

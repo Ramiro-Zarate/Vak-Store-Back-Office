@@ -1,0 +1,44 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.heading {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolbar .input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.count {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.gain {
+  font-weight: 600;
+  color: var(--green);
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
