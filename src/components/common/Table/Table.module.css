@@ -2,6 +2,7 @@
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .table {
@@ -12,7 +13,7 @@
 
 .table th {
   text-align: left;
-  background: #f8f9fb;
+  background: #f8f9fc;
   color: var(--text-muted);
   font-weight: 600;
   font-size: 12.5px;
@@ -33,6 +34,10 @@
   border-bottom: none;
 }
 
+.table tbody tr {
+  transition: background 0.12s ease;
+}
+
 .table tbody tr:hover {
-  background: #fafbfc;
+  background: #f6f7fb;
 }

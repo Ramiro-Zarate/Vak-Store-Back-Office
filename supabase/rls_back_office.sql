@@ -22,10 +22,22 @@ begin
     foreach op in array ops loop
       pol := 'back_office_' || t || '_' || op;
       execute format('drop policy if exists %I on public.%I', pol, t);
-      execute format(
-        'create policy %I on public.%I for %s to authenticated using (public.is_back_office_admin()) with check (public.is_back_office_admin())',
-        pol, t, op
-      );
+      if op = 'select' then
+        execute format(
+          'create policy %I on public.%I for select to authenticated using (public.is_back_office_admin())',
+          pol, t
+        );
+      elsif op = 'insert' then
+        execute format(
+          'create policy %I on public.%I for insert to authenticated with check (public.is_back_office_admin())',
+          pol, t
+        );
+      else
+        execute format(
+          'create policy %I on public.%I for %s to authenticated using (public.is_back_office_admin()) with check (public.is_back_office_admin())',
+          pol, t, op
+        );
+      end if;
     end loop;
   end loop;
 end $$;

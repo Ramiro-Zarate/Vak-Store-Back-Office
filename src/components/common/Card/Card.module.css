@@ -4,6 +4,12 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-strong);
 }
 
 .header {
@@ -17,4 +23,5 @@
 .title {
   font-size: 16px;
   font-weight: 600;
+  color: var(--text);
 }

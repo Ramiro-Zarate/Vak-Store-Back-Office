@@ -71,6 +71,28 @@ export async function updateProductActive(productId, isActive) {
   return data
 }
 
+export async function createProduct({ name, category, description, is_active }) {
+  const { data, error } = await supabase
+    .from('products')
+    .insert({ name, category, description, is_active })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function createVariant({ product_id, version, size, club, league, price, stock_quantity }) {
+  const { data, error } = await supabase
+    .from('product_variants')
+    .insert({ product_id, version, size, club, league, price, stock_quantity })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 export async function fetchCosts() {
   const { data, error } = await supabase.from('product_costs').select('*')
 
