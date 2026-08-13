@@ -28,14 +28,9 @@
 .logo {
   width: 34px;
   height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
-  color: #fff;
-  font-weight: 700;
-  font-size: 13px;
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.45);
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: contain;
 }
 
 .brandText {

@@ -38,7 +38,7 @@ export default function Login() {
     <div className={styles.page}>
       <form className={styles.card} onSubmit={handleSubmit}>
         <div className={styles.brand}>
-          <span className={styles.logo}>VK</span>
+          <img className={styles.logo} src="/logo.png" alt="Vak Store" />
           <h1 className={styles.title}>{APP_NAME}</h1>
         </div>
 

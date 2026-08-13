@@ -58,7 +58,7 @@ export default function Layout() {
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
-          <span className={styles.logo}>VK</span>
+          <img className={styles.logo} src="/logo.png" alt="Vak Store" />
           <span className={styles.brandText}>{APP_NAME}</span>
         </div>
         <nav className={styles.nav}>
