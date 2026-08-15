@@ -221,7 +221,8 @@ export default function Products() {
                   />
                 </td>
                 <td className={styles.actionCell}>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => openNewVariant(product)}>
+                  <div className={styles.buttonActions}>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => openNewVariant(product)}>
                     ＋ Variante
                   </button>
                   <button
@@ -232,6 +233,7 @@ export default function Products() {
                   >
                     {savingId === product.id ? '…' : 'Guardar'}
                   </button>
+                  </div>
                 </td>
               </tr>
             </Fragment>
@@ -277,7 +279,7 @@ export default function Products() {
               className="input"
               value={newProduct.category}
               onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-              placeholder="camiseta"
+              placeholder="camisetas"
             />
           </div>
           <div className="field">
@@ -335,7 +337,7 @@ export default function Products() {
                 className="input"
                 value={newVariant.version}
                 onChange={(e) => setNewVariant({ ...newVariant, version: e.target.value })}
-                placeholder="2025/26"
+                placeholder="jugador/fan/retro"
               />
             </div>
             <div className="field">

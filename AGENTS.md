@@ -14,6 +14,8 @@ La interfaz está en español. No es un proyecto público: solo acceden los 2 ad
 - React Router (rutas de la app).
 - `@supabase/supabase-js` como cliente directo a la BD (no hay backend propio).
 - **CSS Modules** por componente (`*.module.css`). Utilidades globales (`.btn`, `.input`, `.select`, `.field`, `.alert`) en `src/index.css`.
+- **Design tokens** (colores, sombras, radios) definidos como variables CSS en `src/index.css` (`:root`). El acento es índigo (`--accent: #6366f1`); cambiar colores solo desde ahí, no hardcodear.
+- Logo/brand en `public/logo.png` (favicon en `index.html` + logo del sidebar y login).
 
 ## Comandos
 
@@ -50,7 +52,7 @@ Campos clave:
 
 ### Agregados por el back office (scripts en `supabase/`)
 - `migration.sql`: crea la tabla `product_costs` (`product_id` → `cost`, RLS admin) y la función `public.is_back_office_admin()` (devuelve true si el JWT es de un email admin). **Solo agrega, no toca tablas existentes.**
-- `rls_back_office.sql`: políticas RLS **aditivas** (select/insert/update para los emails admin) sobre `orders`, `order_items`, `product_variants`, `products`, `product_costs`. **Correrlo en Supabase para que el back office pueda escribir** (guardar ventas, actualizar stock/estados). Sin esto, las escrituras fallan con error de permisos.
+- `rls_back_office.sql`: políticas RLS **aditivas** (select/insert/update para los emails admin) sobre `orders`, `order_items`, `product_variants`, `products`, `product_costs`. Habilita todas las escrituras del back office: ventas, stock, estados, **alta de productos/variantes** y costos. Correrlo en Supabase; sin esto las escrituras fallan con error de permisos. **Ya aplicado en producción.**
 
 ## Reglas de negocio
 
@@ -83,6 +85,12 @@ Dashboard (KPIs + gráfica) y Reportes cuentan **únicamente** pedidos con statu
 - Métodos de envío: `retira_local` (costo $0), `motomensajeria`, más los registros de `shipping_methods`.
 - Al guardar: crea la orden, los items y actualiza `stock_quantity`. Puede fallar con error de permisos si no se corrió `rls_back_office.sql`.
 
+### Alta de productos y variantes (pantalla Productos)
+- El back office puede **crear productos y variantes** (no solo editar existentes): botón **"＋ Nuevo producto"** en la toolbar y **"＋ Variante"** por fila de producto (modales reutilizando `Modal`).
+- Son inserts directos en `products` / `product_variants` vía `createProduct` y `createVariant` (`src/lib/api.js`). Requieren las políticas de insert de `rls_back_office.sql` (ya cubiertas).
+- El alta **no pide imágenes**: la columna `products.images` se carga por Supabase/BD.
+- La variante nueva aparece al instante en Stock (para ajustar stock) y en Ventas (para venderla). El costo se asigna después en Productos (columna "Costo (ARS)").
+
 ## Arquitectura
 
 ```
@@ -104,7 +112,7 @@ src/
     variant.js                 # variantLabel(variant)
   components/
     common/                    # Card, Table, Badge, Modal, Spinner, StatusBadge (cada uno con su .module.css)
-    Layout/                    # sidebar + topbar
+    Layout/                    # sidebar + topbar + íconos inline SVG
     ProtectedRoute/            # gate de auth + lista blanca
     Login/
   screens/                     # Dashboard, Ventas (+NewSaleForm), Orders, Stock, Products, Reports
@@ -126,11 +134,14 @@ Rutas: `/login` → `/` (Dashboard), `/ventas`, `/pedidos`, `/stock`, `/producto
 1. `npm install`.
 2. Copiar `.env.example` a `.env` y completar URL + anon key + emails admin.
 3. En el panel de Supabase: crear los 2 usuarios en `Authentication → Users`, habilitar Email auth (opcional: desactivar "Confirm email" para login directo).
-4. Correr `supabase/migration.sql` en el SQL Editor (reemplazando los emails placeholder de la función `is_back_office_admin`).
-5. Para poder escribir (ventas/stock/estados): correr `supabase/rls_back_office.sql`.
+4. Correr `supabase/migration.sql` en el SQL Editor (verificar/actualizar los emails admin de la función `is_back_office_admin`).
+5. Para poder escribir (ventas/stock/estados/altas): correr `supabase/rls_back_office.sql`.
 
-## Deploy (Vercel, pendiente)
+## Deploy (Vercel, en producción)
 
-- Cargar las 3 variables de entorno en Vercel.
-- Correr `rls_back_office.sql` antes de habilitar la escritura desde producción.
-- Configurar la Site URL/redirect de Supabase Auth al dominio del deploy.
+- **URL**: https://vak-store-back-office.vercel.app
+- Hosting estático en Vercel: detecta Vite solo (build `npm run build`, output `dist`).
+- `vercel.json` con SPA fallback: `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }`. Es **obligatorio** porque la app usa `BrowserRouter`; sin esto, refrescar o entrar directo a `/ventas`, `/stock`, etc. da 404.
+- Variables en Vercel (Settings → Environment Variables, cargadas **antes** del build): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ADMIN_EMAILS`. Si faltan, el build compila pero la app queda en blanco en runtime.
+- Supabase Auth: la **Site URL** queda con el dominio de la tienda online (el back office no la necesita: el login es email+contraseña sin redirecciones). Opcional: agregar el dominio del back office a *Redirect URLs*.
+- Cada `git push` a `main` redeployea solo. El login solo deja entrar a los 2 emails admin.
