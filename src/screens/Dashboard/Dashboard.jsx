@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
-import { buildOrderItemMetrics } from '../../lib/profit'
+import { buildOrdersMetrics } from '../../lib/profit'
 import { formatMoney, formatDateShort } from '../../lib/format'
 import { ORDER_STATUS_LABELS, ORDER_STATUSES } from '../../config/constants'
 import { isPaidOrder } from '../../lib/orders'
@@ -17,11 +17,7 @@ export default function Dashboard() {
   const summary = useMemo(() => {
     const validOrders = (orders ?? []).filter(isPaidOrder)
 
-    const totals = buildOrderItemMetrics(
-      validOrders.flatMap((o) => o.order_items ?? []),
-      variantsById,
-      costsByProduct,
-    )
+    const totals = buildOrdersMetrics(validOrders, variantsById, costsByProduct)
 
     const byStatus = {}
     for (const status of ORDER_STATUSES) byStatus[status] = 0

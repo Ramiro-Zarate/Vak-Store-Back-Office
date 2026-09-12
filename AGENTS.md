@@ -68,20 +68,23 @@ La **reinversión total = costo + 15% de la cuenta** (el costo vuelve 100% a rei
 - El **costo vive en la tabla `product_costs`** (centralizado, compartido entre los 2 admins), keyed por `product_id`. Se edita en la pantalla Productos.
 - `MP_FEE_PERCENT = 0`: comisión de MercadoPago **no se descuenta por ahora** (feature futura).
 - **Envío neutro**: lo paga el cliente 100%. Nunca afecta la cuenta venta − costo. Se guarda solo en `orders.shipping_cost` y no entra en los cálculos de ganancia.
+- **Venta real = `total_amount − shipping_cost`**: el back office calcula la venta desde el total del pedido, no desde `order_items.unit_price`. La tienda aplica un **15% de descuento por transferencia** (`TRANSFER_DISCOUNT` en el store) que **no se guarda por item**: `order_items.unit_price` queda al precio de lista y solo `orders.total_amount` refleja el neto. `orderRevenueFactor(order, ...)` (`src/lib/profit.js`) reparte la venta real proporcionalmente entre los items (factor = 1 en MP y ventas manuales, 0,85 en transferencias).
 
 ### Status de pedido (columna `orders.status`)
-`pending` (Pendiente MP), `await_payment` (Esperando pago transferencia), `paid`, `processing` (Procesando), `shipped` (Enviado), `delivered` (Entregado), `cancelled` (Cancelado). Ver `ORDER_STATUSES` / `ORDER_STATUS_LABELS` en constants.
+`pending` (Pendiente MP), `awaiting_payment` (Esperando pago transferencia), `paid`, `processing` (Procesando), `shipped` (Enviado), `delivered` (Entregado), `cancelled` (Cancelado). Ver `ORDER_STATUSES` / `ORDER_STATUS_LABELS` en constants.
+
+- El valor real que escribe la tienda para transferencia es **`awaiting_payment`** (con `ing`). El back office lo adopta como canónico y `normalizeOrderStatus()` (`src/lib/orders.js`) mapea el alias viejo **`await_payment`** para no romper pedidos históricos/ventas manuales.
 
 - `payment_status` es **redundante** y el back office **no lo gestiona** (se eliminó de toda la UI). No escribirlo ni leerlo.
 - Al pasar un pedido a `shipped`, se setea `shipped_at` automáticamente si no tenía (`src/screens/Orders/Orders.jsx`).
 - Modificar el estado desde acá es un `UPDATE` directo a la BD compartida: el cliente lo ve en la tienda al instante.
 
 ### Solo pedidos cobrados en números
-Dashboard (KPIs + gráfica) y Reportes cuentan **únicamente** pedidos con status en `paid/processing/shipped/delivered` (helper `isPaidOrder` en `src/lib/orders.js`). `pending`, `await_payment` y `cancelled` quedan fuera de ventas/ganancia.
+Dashboard (KPIs + gráfica) y Reportes cuentan **únicamente** pedidos con status en `paid/processing/shipped/delivered` (helper `isPaidOrder` en `src/lib/orders.js`). `pending`, `awaiting_payment` y `cancelled` quedan fuera de ventas/ganancia.
 
 ### Ventas manuales (pantalla Ventas)
 - Se insertan directo en `orders` + `order_items` (filas nuevas, sin tocar esquema) y **descuentan stock** de cada variante.
-- Se identifican por el helper `isManualOrder`: orden sin `payment_intent_id` y sin `bank_info_snapshot` (las de web por MP tienen el intent; las de transferencia tienen el snapshot).
+- Se identifican por el helper `isManualOrder`: orden sin `payment_intent_id`, sin `bank_info_snapshot` y sin `payment_status` (la tienda siempre setea `payment_status` al crear, incluso en `pending`; el back office nunca lo escribe).
 - Métodos de envío: `retira_local` (costo $0), `motomensajeria`, más los registros de `shipping_methods`.
 - Al guardar: crea la orden, los items y actualiza `stock_quantity`. Puede fallar con error de permisos si no se corrió `rls_back_office.sql`.
 

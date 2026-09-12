@@ -2,8 +2,9 @@ import { Fragment, useMemo, useState } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
 import { updateOrder } from '../../lib/api'
 import { formatMoney, formatDate, toNumber } from '../../lib/format'
-import { buildOrderItemMetrics } from '../../lib/profit'
-import { shippingLabel } from '../../lib/orders'
+import { buildOrderMetrics, orderRevenueFactor } from '../../lib/profit'
+import { shippingLabel, normalizeOrderStatus } from '../../lib/orders'
+import { variantLabel } from '../../lib/variant'
 import { ORDER_STATUSES, ORDER_STATUS_LABELS } from '../../config/constants'
 import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
@@ -132,7 +133,7 @@ export default function Orders() {
       <Table columns={['Pedido', 'Cliente', 'Estado', 'Método', 'Total', 'Tracking', 'Fecha', '']}>
         {filtered.map((order) => {
           const isOpen = expandedId === order.id
-          const metrics = buildOrderItemMetrics(order.order_items, variantsById, costsByProduct)
+          const metrics = buildOrderMetrics(order, variantsById, costsByProduct)
 
           return (
             <Fragment key={order.id}>
@@ -169,6 +170,7 @@ export default function Orders() {
                     <OrderDetail
                       order={order}
                       metrics={metrics}
+                      variantsById={variantsById}
                       saving={savingId === order.id}
                       onSave={handleSave}
                       onMarkShipped={handleMarkShipped}
@@ -184,13 +186,14 @@ export default function Orders() {
   )
 }
 
-function OrderDetail({ order, metrics, saving, onSave, onMarkShipped }) {
-  const [status, setStatus] = useState(order.status)
+function OrderDetail({ order, metrics, variantsById, saving, onSave, onMarkShipped }) {
+  const [status, setStatus] = useState(normalizeOrderStatus(order.status))
+  const factor = orderRevenueFactor(order)
   const [carrier, setCarrier] = useState(order.carrier ?? '')
   const [tracking, setTracking] = useState(order.tracking_number ?? '')
 
   function reset() {
-    setStatus(order.status)
+    setStatus(normalizeOrderStatus(order.status))
     setCarrier(order.carrier ?? '')
     setTracking(order.tracking_number ?? '')
   }
@@ -201,14 +204,22 @@ function OrderDetail({ order, metrics, saving, onSave, onMarkShipped }) {
         <div>
           <h4 className={styles.detailTitle}>Items</h4>
           <ul className={styles.items}>
-            {(order.order_items ?? []).map((item) => (
-              <li key={item.id} className={styles.item}>
-                <span>
-                  {item.product_variant_id.slice(0, 8)} × {item.quantity}
-                </span>
-                <span>{formatMoney(toNumber(item.unit_price) * toNumber(item.quantity))}</span>
-              </li>
-            ))}
+            {(order.order_items ?? []).map((item) => {
+              const variant = variantsById[item.product_variant_id]
+              const label = variant ? variantLabel(variant) : item.product_variant_id.slice(0, 8)
+              const image = variant?.products?.images?.[0]
+              return (
+                <li key={item.id} className={styles.item}>
+                  <span className={styles.itemMain}>
+                    {image && <img className={styles.itemThumb} src={image} alt="" loading="lazy" />}
+                    <span className={styles.itemLabel}>
+                      {label} × {item.quantity}
+                    </span>
+                  </span>
+                  <span>{formatMoney(toNumber(item.unit_price) * toNumber(item.quantity) * factor)}</span>
+                </li>
+              )
+            })}
           </ul>
           <div className={styles.metrics}>
             <span>Venta: <strong>{formatMoney(metrics.venta)}</strong></span>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
-import { buildOrderItemMetrics, buildProductReport, emptyTotals } from '../../lib/profit'
+import { buildOrdersMetrics, buildProductReport, emptyTotals } from '../../lib/profit'
 import { formatMoney } from '../../lib/format'
 import { isPaidOrder } from '../../lib/orders'
 import Card from '../../components/common/Card/Card'
@@ -27,8 +27,7 @@ export default function Reports() {
       return true
     })
 
-    const allItems = base.flatMap((o) => o.order_items ?? [])
-    const totals = buildOrderItemMetrics(allItems, variantsById, costsByProduct)
+    const totals = buildOrdersMetrics(base, variantsById, costsByProduct)
     const perProduct = buildProductReport(base, variantsById, costsByProduct)
 
     return { totals, perProduct }

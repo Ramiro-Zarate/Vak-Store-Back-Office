@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
 import { useShippingMethods } from '../../hooks/useShippingMethods'
-import { buildOrderItemMetrics } from '../../lib/profit'
+import { buildOrderMetrics } from '../../lib/profit'
 import { formatMoney, formatDate } from '../../lib/format'
 import { isManualOrder, shippingLabel } from '../../lib/orders'
 import { PAYMENT_METHOD_LABELS } from '../../config/constants'
@@ -69,7 +69,7 @@ export default function Ventas() {
 
       <Table columns={['Cliente', 'Pago', 'Estado', 'Total', 'Ganancia', 'Envío', 'Fecha', '']}>
         {manualOrders.map((order) => {
-          const metrics = buildOrderItemMetrics(order.order_items, variantsById, costsByProduct)
+          const metrics = buildOrderMetrics(order, variantsById, costsByProduct)
           return (
             <tr key={order.id}>
               <td>

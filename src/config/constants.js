@@ -13,7 +13,7 @@ export const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS ?? '')
 
 export const ORDER_STATUSES = [
   'pending',
-  'await_payment',
+  'awaiting_payment',
   'paid',
   'processing',
   'shipped',
@@ -23,6 +23,7 @@ export const ORDER_STATUSES = [
 
 export const ORDER_STATUS_LABELS = {
   pending: 'Pendiente (MP)',
+  awaiting_payment: 'Esperando pago',
   await_payment: 'Esperando pago',
   paid: 'Pagado',
   processing: 'Procesando',

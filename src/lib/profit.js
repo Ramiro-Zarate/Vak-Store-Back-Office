@@ -24,27 +24,29 @@ export function splitProfit(venta, costo, opts = {}) {
   }
 }
 
-export function buildOrderItemMetrics(orderItems, variantsById, costsByProduct, opts = {}) {
-  let totals = {
-    venta: 0,
-    costo: 0,
-    cuenta: 0,
-    ganancia: 0,
-    marketing: 0,
-    reinversion: 0,
-    fee: 0,
-    qty: 0,
-    missingCost: 0,
-  }
+export function orderRevenueFactor(order) {
+  const items = order.order_items ?? []
+  const itemsSubtotal = items.reduce(
+    (acc, item) => acc + toNumber(item.unit_price) * toNumber(item.quantity),
+    0,
+  )
+  if (itemsSubtotal <= 0) return 1
+  const total = toNumber(order.total_amount)
+  if (total <= 0) return 1
+  const productRevenue = total - toNumber(order.shipping_cost)
+  return productRevenue > 0 ? productRevenue / itemsSubtotal : 0
+}
 
-  for (const item of orderItems ?? []) {
+function accumulateOrder(order, variantsById, costsByProduct, opts, totals) {
+  const factor = orderRevenueFactor(order)
+
+  for (const item of order.order_items ?? []) {
     const variant = variantsById[item.product_variant_id]
-    const cost = variant ? toNumber(costsByProduct[variant.product_id]) : 0
     if (!variant) continue
 
+    const cost = toNumber(costsByProduct[variant.product_id])
     const qty = toNumber(item.quantity)
-    const unitPrice = toNumber(item.unit_price)
-    const split = splitProfit(unitPrice * qty, cost * qty, opts)
+    const split = splitProfit(toNumber(item.unit_price) * qty * factor, cost * qty, opts)
 
     if (cost <= 0) totals.missingCost += qty
 
@@ -61,10 +63,24 @@ export function buildOrderItemMetrics(orderItems, variantsById, costsByProduct, 
   return totals
 }
 
+export function buildOrderMetrics(order, variantsById, costsByProduct, opts = {}) {
+  return accumulateOrder(order, variantsById, costsByProduct, opts, emptyTotals())
+}
+
+export function buildOrdersMetrics(orders, variantsById, costsByProduct, opts = {}) {
+  const totals = emptyTotals()
+  for (const order of orders ?? []) {
+    accumulateOrder(order, variantsById, costsByProduct, opts, totals)
+  }
+  return totals
+}
+
 export function buildProductReport(orders, variantsById, costsByProduct, opts = {}) {
   const report = new Map()
 
   for (const order of orders ?? []) {
+    const factor = orderRevenueFactor(order)
+
     for (const item of order.order_items ?? []) {
       const variant = variantsById[item.product_variant_id]
       if (!variant) continue
@@ -87,7 +103,7 @@ export function buildProductReport(orders, variantsById, costsByProduct, opts = 
       const qty = toNumber(item.quantity)
       const unitPrice = toNumber(item.unit_price)
       const cost = toNumber(costsByProduct[variant.product_id])
-      const split = splitProfit(unitPrice * qty, cost * qty, opts)
+      const split = splitProfit(unitPrice * qty * factor, cost * qty, opts)
 
       if (cost <= 0) entry.missingCost += qty
 

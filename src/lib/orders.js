@@ -12,8 +12,12 @@ export function shippingLabel(method) {
   return SHIPPING_LABELS[method] ?? method ?? '—'
 }
 
+export function normalizeOrderStatus(status) {
+  return status === 'await_payment' ? 'awaiting_payment' : status
+}
+
 export function isManualOrder(order) {
-  return !order.payment_intent_id && !order.bank_info_snapshot
+  return !order.payment_intent_id && !order.bank_info_snapshot && !order.payment_status
 }
 
 export function isPaidOrder(order) {

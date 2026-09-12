@@ -40,7 +40,7 @@ export async function fetchProducts() {
 export async function fetchVariants() {
   const { data, error } = await supabase
     .from('product_variants')
-    .select('*, products (name, category)')
+    .select('*, products (name, category, images)')
     .order('created_at', { ascending: false })
 
   if (error) throw error
