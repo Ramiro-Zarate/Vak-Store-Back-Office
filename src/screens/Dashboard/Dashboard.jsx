@@ -3,7 +3,7 @@ import { useStoreData } from '../../hooks/useStoreData'
 import { buildOrdersMetrics } from '../../lib/profit'
 import { formatMoney, formatDateShort } from '../../lib/format'
 import { ORDER_STATUS_LABELS, ORDER_STATUSES } from '../../config/constants'
-import { isPaidOrder } from '../../lib/orders'
+import { isPaidOrder, isManualOrder } from '../../lib/orders'
 import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
 import Badge from '../../components/common/Badge/Badge'
@@ -16,6 +16,10 @@ export default function Dashboard() {
 
   const summary = useMemo(() => {
     const validOrders = (orders ?? []).filter(isPaidOrder)
+
+    const manualOrders = validOrders.filter(isManualOrder)
+    const manualCount = manualOrders.length
+    const manualRevenue = manualOrders.reduce((acc, o) => acc + Number(o.total_amount ?? 0), 0)
 
     const totals = buildOrdersMetrics(validOrders, variantsById, costsByProduct)
 
@@ -47,6 +51,8 @@ export default function Dashboard() {
     return {
       orderCount: validOrders.length,
       revenue: validOrders.reduce((acc, o) => acc + Number(o.total_amount ?? 0), 0),
+      manualCount,
+      manualRevenue,
       totals,
       byStatus,
       last7,
@@ -60,9 +66,13 @@ export default function Dashboard() {
     return <div className="alert alert-error">{error}</div>
   }
 
-  const { orderCount, revenue, totals, byStatus, last7, maxTotal } = summary
+  const { orderCount, revenue, manualCount, manualRevenue, totals, byStatus, last7, maxTotal } = summary
   const kpis = [
-    { label: 'Ventas cobradas', value: formatMoney(revenue), sub: `${orderCount} pedidos` },
+    {
+      label: 'Ventas cobradas',
+      value: formatMoney(revenue),
+      sub: `${orderCount} pedidos · ${manualCount} particulares (${formatMoney(manualRevenue)})`,
+    },
     { label: 'Ganancia (55%)', value: formatMoney(totals.ganancia), sub: 'de la cuenta venta − costo' },
     { label: 'Marketing (30%)', value: formatMoney(totals.marketing), sub: 'de la cuenta venta − costo' },
     { label: 'Reinversión', value: formatMoney(totals.reinversion), sub: `costo + 15% de la cuenta` },
@@ -99,7 +109,8 @@ export default function Dashboard() {
             ))}
           </div>
           <p className={styles.chartHint}>
-            Solo pedidos cobrados: {formatMoney(revenue)}
+            Solo pedidos cobrados: {formatMoney(revenue)} · {manualCount} particulares (
+            {formatMoney(manualRevenue)})
           </p>
         </Card>
 

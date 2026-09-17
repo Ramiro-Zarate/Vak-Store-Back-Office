@@ -122,6 +122,42 @@ export async function fetchShippingMethods() {
   return data ?? []
 }
 
+export async function cancelManualOrder(order) {
+  const { data: current, error: readError } = await supabase
+    .from('orders')
+    .select('status, order_items (product_variant_id, quantity)')
+    .eq('id', order.id)
+    .single()
+
+  if (readError) throw readError
+  if (current.status === 'cancelled') return current
+
+  const { error: orderError } = await supabase
+    .from('orders')
+    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('id', order.id)
+
+  if (orderError) throw orderError
+
+  for (const item of current.order_items ?? []) {
+    const { data: variant, error: variantError } = await supabase
+      .from('product_variants')
+      .select('stock_quantity')
+      .eq('id', item.product_variant_id)
+      .single()
+
+    if (variantError) throw variantError
+
+    const nextStock = Number(variant?.stock_quantity ?? 0) + Number(item.quantity ?? 0)
+    const { error: stockError } = await supabase
+      .from('product_variants')
+      .update({ stock_quantity: nextStock, updated_at: new Date().toISOString() })
+      .eq('id', item.product_variant_id)
+
+    if (stockError) throw stockError
+  }
+}
+
 export async function createManualOrder({ order, items }) {
   const { data: createdOrder, error: orderError } = await supabase
     .from('orders')
