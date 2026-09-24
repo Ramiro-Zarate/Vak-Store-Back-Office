@@ -1,8 +1,14 @@
 import { useMemo } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
-import { buildOrdersMetrics } from '../../lib/profit'
+import { useExpenses } from '../../hooks/useExpenses'
+import { buildOrdersMetrics, buildFunds } from '../../lib/profit'
 import { formatMoney, formatDateShort } from '../../lib/format'
-import { ORDER_STATUS_LABELS, ORDER_STATUSES } from '../../config/constants'
+import {
+  ORDER_STATUS_LABELS,
+  ORDER_STATUSES,
+  EXPENSE_FUNDS,
+  EXPENSE_FUND_LABELS,
+} from '../../config/constants'
 import { isPaidOrder, isManualOrder } from '../../lib/orders'
 import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
@@ -13,8 +19,11 @@ import { KpiGrid, KpiCard } from '../../components/common/Kpi/Kpi'
 import { OrderStatusBadge } from '../../components/common/StatusBadge/StatusBadge'
 import styles from './Dashboard.module.css'
 
+const fundTone = { cost: 'blue', marketing: 'amber', profit: 'green' }
+
 export default function Dashboard() {
   const { orders, variantsById, costsByProduct, loading, error } = useStoreData()
+  const { expenses } = useExpenses()
 
   const summary = useMemo(() => {
     const validOrders = (orders ?? []).filter(isPaidOrder)
@@ -24,6 +33,7 @@ export default function Dashboard() {
     const manualRevenue = manualOrders.reduce((acc, o) => acc + Number(o.total_amount ?? 0), 0)
 
     const totals = buildOrdersMetrics(validOrders, variantsById, costsByProduct)
+    const { funds } = buildFunds(validOrders, variantsById, costsByProduct, expenses)
 
     const byStatus = {}
     for (const status of ORDER_STATUSES) byStatus[status] = 0
@@ -56,11 +66,12 @@ export default function Dashboard() {
       manualCount,
       manualRevenue,
       totals,
+      funds,
       byStatus,
       last7,
       maxTotal,
     }
-  }, [orders, variantsById, costsByProduct])
+  }, [orders, variantsById, costsByProduct, expenses])
 
   if (loading) return <Spinner />
 
@@ -68,7 +79,8 @@ export default function Dashboard() {
     return <div className="alert alert-error">{error}</div>
   }
 
-  const { orderCount, revenue, manualCount, manualRevenue, totals, byStatus, last7, maxTotal } = summary
+  const { orderCount, revenue, manualCount, manualRevenue, totals, funds, byStatus, last7, maxTotal } =
+    summary
   const kpis = [
     {
       label: 'Ventas cobradas',
@@ -78,6 +90,12 @@ export default function Dashboard() {
     { label: 'Ganancia (55%)', value: formatMoney(totals.ganancia), sub: 'de la cuenta venta − costo' },
     { label: 'Marketing (30%)', value: formatMoney(totals.marketing), sub: 'de la cuenta venta − costo' },
     { label: 'Reinversión', value: formatMoney(totals.reinversion), sub: `costo + 15% de la cuenta` },
+    ...EXPENSE_FUNDS.map((fund) => ({
+      label: `Fondo ${EXPENSE_FUND_LABELS[fund]}`,
+      value: formatMoney(funds[fund].available),
+      sub: `Gastado ${formatMoney(funds[fund].spent)}`,
+      tone: fundTone[fund],
+    })),
   ]
 
   return (
@@ -86,7 +104,7 @@ export default function Dashboard() {
 
       <KpiGrid>
         {kpis.map((kpi) => (
-          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} sub={kpi.sub} />
+          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} sub={kpi.sub} tone={kpi.tone} />
         ))}
       </KpiGrid>
 

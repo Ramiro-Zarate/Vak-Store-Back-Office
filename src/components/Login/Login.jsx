@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/auth'
-import { APP_NAME } from '../../config/constants'
+import { APP_NAME, ADMIN_EMAILS } from '../../config/constants'
 import styles from './Login.module.css'
 
 export default function Login() {
-  const { signIn, isAdmin } = useAuth()
+  const { signIn } = useAuth()
   const navigate = useNavigate()
 
   const [email, setEmail] = useState('')
@@ -19,14 +19,19 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const { error: signInError } = await signIn(email, password)
+      const { data, error: signInError } = await signIn(email, password)
       if (signInError) {
         setError(signInError.message || 'Email o contraseña incorrectos.')
         return
       }
-      if (isAdmin) {
-        navigate('/', { replace: true })
+
+      const signedEmail = (data?.user?.email ?? email).trim().toLowerCase()
+      if (!ADMIN_EMAILS.includes(signedEmail)) {
+        setError('Tu email no está habilitado para ingresar al back office.')
+        return
       }
+
+      navigate('/', { replace: true })
     } catch {
       setError('Ocurrió un error. Intentá de nuevo.')
     } finally {
