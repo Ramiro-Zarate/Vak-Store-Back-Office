@@ -111,6 +111,45 @@ export async function upsertCost(productId, cost) {
   return data
 }
 
+export async function fetchExpenses() {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('*')
+    .order('spent_at', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createExpense(fields) {
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert({ ...fields, updated_at: new Date().toISOString() })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updateExpense(id, fields) {
+  const { data, error } = await supabase
+    .from('expenses')
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function deleteExpense(id) {
+  const { error } = await supabase.from('expenses').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function fetchShippingMethods() {
   const { data, error } = await supabase
     .from('shipping_methods')

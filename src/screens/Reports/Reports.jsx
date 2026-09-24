@@ -1,24 +1,28 @@
 import { useMemo, useState } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
-import { buildOrdersMetrics, buildProductReport, emptyTotals } from '../../lib/profit'
+import { useExpenses } from '../../hooks/useExpenses'
+import { buildOrdersMetrics, buildProductReport, buildFunds, emptyTotals } from '../../lib/profit'
 import { formatMoney } from '../../lib/format'
 import { isPaidOrder } from '../../lib/orders'
+import { EXPENSE_FUNDS, EXPENSE_FUND_LABELS } from '../../config/constants'
 import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
 import Badge from '../../components/common/Badge/Badge'
 import Spinner from '../../components/common/Spinner/Spinner'
+import PageHeader from '../../components/common/PageHeader/PageHeader'
+import DateRangeFilter from '../../components/common/DateRangeFilter/DateRangeFilter'
+import { KpiGrid, KpiCard } from '../../components/common/Kpi/Kpi'
 import styles from './Reports.module.css'
 
 export default function Reports() {
   const { orders, variantsById, costsByProduct, loading, error } = useStoreData()
+  const { expenses, loading: loadingExpenses, error: expensesError } = useExpenses()
 
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
 
-  const { totals, perProduct } = useMemo(() => {
-    if (!orders) return { totals: emptyTotals(), perProduct: [] }
-
+  const { totals, perProduct, funds, totalSpent } = useMemo(() => {
     const base = (orders ?? []).filter((order) => {
       if (!isPaidOrder(order)) return false
       if (paymentMethod && order.payment_method !== paymentMethod) return false
@@ -27,11 +31,23 @@ export default function Reports() {
       return true
     })
 
-    const totals = buildOrdersMetrics(base, variantsById, costsByProduct)
-    const perProduct = buildProductReport(base, variantsById, costsByProduct)
+    const expensesInPeriod = (expenses ?? []).filter((expense) => {
+      if (fromDate && new Date(expense.spent_at) < new Date(`${fromDate}T00:00:00`)) return false
+      if (toDate && new Date(expense.spent_at) > new Date(`${toDate}T23:59:59`)) return false
+      return true
+    })
 
-    return { totals, perProduct }
-  }, [orders, variantsById, costsByProduct, fromDate, toDate, paymentMethod])
+    if (base.length === 0 && expensesInPeriod.length === 0) {
+      return { totals: emptyTotals(), perProduct: [], funds: null, totalSpent: 0 }
+    }
+
+    const nextTotals = buildOrdersMetrics(base, variantsById, costsByProduct)
+    const nextPerProduct = buildProductReport(base, variantsById, costsByProduct)
+    const { funds: nextFunds } = buildFunds(base, variantsById, costsByProduct, expensesInPeriod)
+    const spent = EXPENSE_FUNDS.reduce((acc, fund) => acc + nextFunds[fund].spent, 0)
+
+    return { totals: nextTotals, perProduct: nextPerProduct, funds: nextFunds, totalSpent: spent }
+  }, [orders, expenses, variantsById, costsByProduct, fromDate, toDate, paymentMethod])
 
   function exportCsv() {
     const header = [
@@ -69,7 +85,18 @@ export default function Reports() {
       totals.reinversion.toFixed(2),
     ]
 
-    const csv = [header, ...rows, totalsRow]
+    const fundHeader = ['Fondo', 'Asignado', 'Gastado', 'Disponible']
+    const fundRows = EXPENSE_FUNDS.map((fund) => {
+      const entry = funds?.[fund] ?? { assigned: 0, spent: 0, available: 0 }
+      return [
+        EXPENSE_FUND_LABELS[fund],
+        entry.assigned.toFixed(2),
+        entry.spent.toFixed(2),
+        entry.available.toFixed(2),
+      ]
+    })
+
+    const csv = [header, ...rows, totalsRow, [], fundHeader, ...fundRows]
       .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(';'))
       .join('\n')
 
@@ -82,10 +109,11 @@ export default function Reports() {
     URL.revokeObjectURL(url)
   }
 
-  if (loading) return <Spinner />
+  if (loading || loadingExpenses) return <Spinner />
 
-  if (error) {
-    return <div className="alert alert-error">{error}</div>
+  const loadError = error || expensesError
+  if (loadError) {
+    return <div className="alert alert-error">{loadError}</div>
   }
 
   const summary = [
@@ -95,16 +123,21 @@ export default function Reports() {
     { label: 'Ganancia', value: formatMoney(totals.ganancia), sub: '55% de la cuenta' },
     { label: 'Marketing', value: formatMoney(totals.marketing), sub: '30% de la cuenta' },
     { label: 'Reinversión', value: formatMoney(totals.reinversion), sub: 'costo + 15% de la cuenta' },
+    { label: 'Gastos del período', value: formatMoney(totalSpent), sub: 'movimientos cargados' },
   ]
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>Reportes</h1>
+      <PageHeader title="Reportes" />
 
       <Card>
         <div className={styles.filters}>
-          <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} title="Desde" />
-          <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} title="Hasta" />
+          <DateRangeFilter
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromChange={setFromDate}
+            onToChange={setToDate}
+          />
           <select className="select" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
             <option value="">Método de pago: todos</option>
             <option value="mercadopago">MercadoPago</option>
@@ -123,15 +156,31 @@ export default function Reports() {
         )}
       </Card>
 
-      <div className={styles.kpis}>
+      <KpiGrid>
         {summary.map((kpi) => (
-          <Card key={kpi.label} className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>{kpi.label}</span>
-            <span className={styles.kpiValue}>{kpi.value}</span>
-            <span className={styles.kpiSub}>{kpi.sub}</span>
-          </Card>
+          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} sub={kpi.sub} />
         ))}
-      </div>
+      </KpiGrid>
+
+      {funds && (
+        <Card title="Saldos por fondo">
+          <Table columns={['Fondo', 'Asignado', 'Gastado', 'Disponible']}>
+            {EXPENSE_FUNDS.map((fund) => {
+              const entry = funds[fund]
+              return (
+                <tr key={fund}>
+                  <td>
+                    <Badge tone="neutral">{EXPENSE_FUND_LABELS[fund]}</Badge>
+                  </td>
+                  <td>{formatMoney(entry.assigned)}</td>
+                  <td>{formatMoney(entry.spent)}</td>
+                  <td className={styles.highlight}>{formatMoney(entry.available)}</td>
+                </tr>
+              )
+            })}
+          </Table>
+        </Card>
+      )}
 
       <Card title={`Por producto (${perProduct.length})`}>
         {perProduct.length === 0 ? (

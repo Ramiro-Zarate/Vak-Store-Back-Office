@@ -39,6 +39,13 @@ export function formatDateShort(value) {
   return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
 
+export function formatDateOnly(value) {
+  if (!value) return '—'
+  const [y, m, d] = String(value).slice(0, 10).split('-')
+  if (!y || !m || !d) return '—'
+  return `${d}/${m}/${y.slice(2)}`
+}
+
 export function toNumber(value) {
   const num = Number(value)
   return Number.isFinite(num) ? num : 0

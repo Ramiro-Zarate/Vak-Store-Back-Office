@@ -8,6 +8,8 @@ import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
 import Badge from '../../components/common/Badge/Badge'
 import Spinner from '../../components/common/Spinner/Spinner'
+import PageHeader from '../../components/common/PageHeader/PageHeader'
+import { KpiGrid, KpiCard } from '../../components/common/Kpi/Kpi'
 import { OrderStatusBadge } from '../../components/common/StatusBadge/StatusBadge'
 import styles from './Dashboard.module.css'
 
@@ -80,17 +82,13 @@ export default function Dashboard() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>Dashboard</h1>
+      <PageHeader title="Dashboard" />
 
-      <div className={styles.kpis}>
+      <KpiGrid>
         {kpis.map((kpi) => (
-          <Card key={kpi.label} className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>{kpi.label}</span>
-            <span className={styles.kpiValue}>{kpi.value}</span>
-            <span className={styles.kpiSub}>{kpi.sub}</span>
-          </Card>
+          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} sub={kpi.sub} />
         ))}
-      </div>
+      </KpiGrid>
 
       <div className={styles.grid}>
         <Card title="Ventas últimos 7 días">

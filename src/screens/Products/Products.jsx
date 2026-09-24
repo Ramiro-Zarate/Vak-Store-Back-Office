@@ -1,12 +1,16 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
 import { useProducts } from '../../hooks/useProducts'
+import { useNotice } from '../../hooks/useNotice'
 import { upsertCost, updateProductActive, createProduct, createVariant } from '../../lib/api'
 import { formatMoney, toNumber } from '../../lib/format'
+import { variantShortLabel } from '../../lib/variant'
 import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
 import Badge from '../../components/common/Badge/Badge'
 import Modal from '../../components/common/Modal/Modal'
+import Notice from '../../components/common/Notice/Notice'
+import PageHeader from '../../components/common/PageHeader/PageHeader'
 import Spinner from '../../components/common/Spinner/Spinner'
 import styles from './Products.module.css'
 
@@ -16,11 +20,11 @@ const emptyVariant = { version: '', size: '', club: '', league: '', price: '', s
 export default function Products() {
   const { costsByProduct, refresh: refreshStore } = useStoreData()
   const { products, loading, error, refresh: refreshProducts } = useProducts()
+  const { notice, notifySuccess, notifyError, clear } = useNotice()
 
   const [search, setSearch] = useState('')
   const [costDrafts, setCostDrafts] = useState({})
   const [savingId, setSavingId] = useState(null)
-  const [notice, setNotice] = useState({ type: '', text: '' })
 
   const [productOpen, setProductOpen] = useState(false)
   const [newProduct, setNewProduct] = useState(emptyProduct)
@@ -41,28 +45,28 @@ export default function Products() {
     const raw = costDrafts[product.id]
     const cost = Math.max(0, toNumber(raw))
     setSavingId(product.id)
-    setNotice({ type: '', text: '' })
+    clear()
     try {
       await upsertCost(product.id, cost)
       setCostDrafts((prev) => ({ ...prev, [product.id]: undefined }))
       await refreshStore()
       await refreshProducts()
-      setNotice({ type: 'success', text: `Costo de "${product.name}" guardado (${formatMoney(cost)}).` })
+      notifySuccess(`Costo de "${product.name}" guardado (${formatMoney(cost)}).`)
     } catch (err) {
-      setNotice({ type: 'error', text: err.message ?? 'Error al guardar el costo.' })
+      notifyError(err.message ?? 'Error al guardar el costo.')
     } finally {
       setSavingId(null)
     }
   }
 
   async function handleToggle(product) {
-    setNotice({ type: '', text: '' })
+    clear()
     try {
       await updateProductActive(product.id, !product.is_active)
       await refreshStore()
       await refreshProducts()
     } catch (err) {
-      setNotice({ type: 'error', text: err.message ?? 'Error al actualizar.' })
+      notifyError(err.message ?? 'Error al actualizar.')
     }
   }
 
@@ -87,7 +91,7 @@ export default function Products() {
       await refreshStore()
       await refreshProducts()
       setProductOpen(false)
-      setNotice({ type: 'success', text: `Producto "${name}" creado.` })
+      notifySuccess(`Producto "${name}" creado.`)
     } catch (err) {
       setProductError(err.message ?? 'Error al crear el producto.')
     } finally {
@@ -133,7 +137,7 @@ export default function Products() {
       await refreshStore()
       await refreshProducts()
       setVariantProduct(null)
-      setNotice({ type: 'success', text: `Variante "${version} · ${size}" creada en "${variantProduct.name}".` })
+      notifySuccess(`Variante "${version} · ${size}" creada en "${variantProduct.name}".`)
     } catch (err) {
       setVariantError(err.message ?? 'Error al crear la variante.')
     } finally {
@@ -149,7 +153,7 @@ export default function Products() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>Productos</h1>
+      <PageHeader title="Productos" />
 
       <Card>
         <div className={styles.toolbar}>
@@ -165,11 +169,7 @@ export default function Products() {
         </div>
       </Card>
 
-      {notice.text && (
-        <div className={`alert ${notice.type === 'error' ? 'alert-error' : 'alert-success'}`}>
-          {notice.text}
-        </div>
-      )}
+      <Notice notice={notice} />
 
       <Table columns={['Producto', 'Categoría', 'Variantes', 'Stock total', 'Estado', 'Costo (ARS)', '']}>
         {filtered.map((product) => {
@@ -194,7 +194,7 @@ export default function Products() {
                   <Badge tone="neutral">{product.category ?? '—'}</Badge>
                 </td>
                 <td className={styles.mono}>
-                  {hasVariants ? variants.slice(0, 3).map((v) => variantLabel(v)).join(', ') : '—'}
+                  {hasVariants ? variants.slice(0, 3).map((v) => variantShortLabel(v)).join(', ') : '—'}
                 </td>
                 <td>
                   <Badge tone={totalStock === 0 ? 'red' : totalStock < 10 ? 'amber' : 'green'}>
@@ -401,9 +401,4 @@ export default function Products() {
       </Modal>
     </div>
   )
-}
-
-function variantLabel(variant) {
-  const parts = [variant.version, variant.size, variant.club, variant.league].filter(Boolean)
-  return parts.join(' · ') || '—'
 }

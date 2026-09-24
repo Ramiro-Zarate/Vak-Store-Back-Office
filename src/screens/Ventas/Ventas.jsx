@@ -1,17 +1,24 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
 import { useShippingMethods } from '../../hooks/useShippingMethods'
+import { useNotice } from '../../hooks/useNotice'
 import { cancelManualOrder } from '../../lib/api'
-import { buildOrderMetrics, orderRevenueFactor } from '../../lib/profit'
-import { formatMoney, formatDate, toNumber } from '../../lib/format'
+import { buildOrderMetrics } from '../../lib/profit'
+import { formatMoney, formatDate } from '../../lib/format'
 import { isManualOrder, shippingLabel } from '../../lib/orders'
-import { variantLabel } from '../../lib/variant'
 import { PAYMENT_METHOD_LABELS } from '../../config/constants'
 import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
 import Badge from '../../components/common/Badge/Badge'
 import Modal from '../../components/common/Modal/Modal'
+import Notice from '../../components/common/Notice/Notice'
+import PageHeader from '../../components/common/PageHeader/PageHeader'
 import Spinner from '../../components/common/Spinner/Spinner'
+import {
+  OrderItemsList,
+  OrderMetrics,
+  ShippingInfo,
+} from '../../components/common/OrderDetail/OrderDetail'
 import { OrderStatusBadge } from '../../components/common/StatusBadge/StatusBadge'
 import NewSaleForm from './NewSaleForm'
 import styles from './Ventas.module.css'
@@ -19,10 +26,10 @@ import styles from './Ventas.module.css'
 export default function Ventas() {
   const { orders, variants, variantsById, costsByProduct, loading, error, refresh } = useStoreData()
   const { shippingMethods } = useShippingMethods()
+  const { notice, notifySuccess, notifyError } = useNotice()
 
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
-  const [notice, setNotice] = useState({ type: '', text: '' })
   const [expandedId, setExpandedId] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [cancelling, setCancelling] = useState(false)
@@ -47,11 +54,11 @@ export default function Ventas() {
     try {
       await cancelManualOrder(cancelTarget)
       await refresh()
-      setNotice({ type: 'success', text: 'Venta cancelada y stock restaurado.' })
+      notifySuccess('Venta cancelada y stock restaurado.')
       setExpandedId(null)
       setCancelTarget(null)
     } catch (err) {
-      setNotice({ type: 'error', text: err.message ?? 'Error al cancelar la venta.' })
+      notifyError(err.message ?? 'Error al cancelar la venta.')
     } finally {
       setCancelling(false)
     }
@@ -65,7 +72,7 @@ export default function Ventas() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>Ventas</h1>
+      <PageHeader title="Ventas" />
 
       <Card>
         <div className={styles.toolbar}>
@@ -82,11 +89,7 @@ export default function Ventas() {
         <p className={styles.count}>{manualOrders.length} ventas manuales</p>
       </Card>
 
-      {notice.text && (
-        <div className={`alert ${notice.type === 'error' ? 'alert-error' : 'alert-success'}`}>
-          {notice.text}
-        </div>
-      )}
+      <Notice notice={notice} />
 
       <Table columns={['Cliente', 'Pago', 'Estado', 'Total', 'Ganancia', 'Envío', 'Fecha', 'ID', '']}>
         {manualOrders.map((order) => {
@@ -144,11 +147,9 @@ export default function Ventas() {
           onCreated={async () => {
             await refresh()
             setFormOpen(false)
-            setNotice({ type: 'success', text: 'Venta registrada y stock actualizado.' })
+            notifySuccess('Venta registrada y stock actualizado.')
           }}
-          onError={(message) =>
-            setNotice({ type: 'error', text: message ?? 'Error al registrar la venta.' })
-          }
+          onError={(message) => notifyError(message ?? 'Error al registrar la venta.')}
         />
       </Modal>
 
@@ -196,7 +197,6 @@ export default function Ventas() {
 }
 
 function ManualSaleDetail({ order, metrics, variantsById, onCancel }) {
-  const factor = orderRevenueFactor(order)
   const cancelled = order.status === 'cancelled'
 
   return (
@@ -204,70 +204,13 @@ function ManualSaleDetail({ order, metrics, variantsById, onCancel }) {
       <div className={styles.detailGrid}>
         <div>
           <h4 className={styles.detailTitle}>Items</h4>
-          <ul className={styles.items}>
-            {(order.order_items ?? []).map((item) => {
-              const variant = variantsById[item.product_variant_id]
-              const label = variant ? variantLabel(variant) : item.product_variant_id.slice(0, 8)
-              const image = variant?.products?.images?.[0]
-              return (
-                <li key={item.id} className={styles.item}>
-                  <span className={styles.itemMain}>
-                    {image && <img className={styles.itemThumb} src={image} alt="" loading="lazy" />}
-                    <span className={styles.itemLabel}>
-                      {label} × {item.quantity}
-                    </span>
-                  </span>
-                  <span>
-                    {formatMoney(toNumber(item.unit_price) * toNumber(item.quantity) * factor)}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-          <div className={styles.metrics}>
-            <span>
-              Venta: <strong>{formatMoney(metrics.venta)}</strong>
-            </span>
-            <span>
-              Costo: <strong>{formatMoney(metrics.costo)}</strong>
-            </span>
-            <span>
-              Cuenta: <strong>{formatMoney(metrics.cuenta)}</strong>
-            </span>
-            <span>
-              Ganancia: <strong>{formatMoney(metrics.ganancia)}</strong>
-            </span>
-          </div>
+          <OrderItemsList order={order} variantsById={variantsById} />
+          <OrderMetrics metrics={metrics} />
         </div>
 
         <div>
           <h4 className={styles.detailTitle}>Envío</h4>
-          <ul className={styles.shipList}>
-            <li>
-              <span>Método</span>
-              <span>{shippingLabel(order.shipping_method)}</span>
-            </li>
-            <li>
-              <span>Dirección</span>
-              <span>{order.shipping_address ?? '—'}</span>
-            </li>
-            <li>
-              <span>Ciudad</span>
-              <span>{order.shipping_city ?? '—'}</span>
-            </li>
-            <li>
-              <span>Provincia</span>
-              <span>{order.province ?? '—'}</span>
-            </li>
-            <li>
-              <span>Teléfono</span>
-              <span>{order.phone ?? '—'}</span>
-            </li>
-            <li>
-              <span>Costo envío</span>
-              <span>{formatMoney(order.shipping_cost)}</span>
-            </li>
-          </ul>
+          <ShippingInfo order={order} />
         </div>
       </div>
 

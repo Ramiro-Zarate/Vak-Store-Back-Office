@@ -1,14 +1,22 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
+import { useNotice } from '../../hooks/useNotice'
 import { updateOrder } from '../../lib/api'
-import { formatMoney, formatDate, toNumber } from '../../lib/format'
-import { buildOrderMetrics, orderRevenueFactor } from '../../lib/profit'
-import { shippingLabel, normalizeOrderStatus } from '../../lib/orders'
-import { variantLabel } from '../../lib/variant'
+import { formatMoney, formatDate } from '../../lib/format'
+import { buildOrderMetrics } from '../../lib/profit'
+import { normalizeOrderStatus } from '../../lib/orders'
 import { ORDER_STATUSES, ORDER_STATUS_LABELS } from '../../config/constants'
 import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
+import Notice from '../../components/common/Notice/Notice'
+import PageHeader from '../../components/common/PageHeader/PageHeader'
+import DateRangeFilter from '../../components/common/DateRangeFilter/DateRangeFilter'
 import Spinner from '../../components/common/Spinner/Spinner'
+import {
+  OrderItemsList,
+  OrderMetrics,
+  ShippingInfo,
+} from '../../components/common/OrderDetail/OrderDetail'
 import {
   OrderStatusBadge,
   PaymentMethodBadge,
@@ -17,6 +25,7 @@ import styles from './Orders.module.css'
 
 export default function Orders() {
   const { orders, variantsById, costsByProduct, loading, error, refresh } = useStoreData()
+  const { notice, notifySuccess, notifyError } = useNotice()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -25,7 +34,6 @@ export default function Orders() {
 
   const [expandedId, setExpandedId] = useState(null)
   const [savingId, setSavingId] = useState(null)
-  const [notice, setNotice] = useState({ type: '', text: '' })
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -53,7 +61,6 @@ export default function Orders() {
 
   async function handleSave(order, fields) {
     setSavingId(order.id)
-    setNotice({ type: '', text: '' })
     try {
       const nextFields = { ...fields }
       if (fields.status === 'shipped' && !order.shipped_at) {
@@ -61,9 +68,9 @@ export default function Orders() {
       }
       await updateOrder(order.id, nextFields)
       await refresh()
-      setNotice({ type: 'success', text: `Pedido ${order.id.slice(0, 8)} actualizado.` })
+      notifySuccess(`Pedido ${order.id.slice(0, 8)} actualizado.`)
     } catch (err) {
-      setNotice({ type: 'error', text: err.message ?? 'Error al guardar.' })
+      notifyError(err.message ?? 'Error al guardar.')
     } finally {
       setSavingId(null)
     }
@@ -84,7 +91,7 @@ export default function Orders() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>Pedidos</h1>
+      <PageHeader title="Pedidos" />
 
       <Card>
         <div className={styles.filters}>
@@ -106,29 +113,17 @@ export default function Orders() {
               </option>
             ))}
           </select>
-          <input
-            className="input"
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            title="Desde"
-          />
-          <input
-            className="input"
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            title="Hasta"
+          <DateRangeFilter
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromChange={setFromDate}
+            onToChange={setToDate}
           />
         </div>
         <p className={styles.count}>{filtered.length} pedidos</p>
       </Card>
 
-      {notice.text && (
-        <div className={`alert ${notice.type === 'error' ? 'alert-error' : 'alert-success'}`}>
-          {notice.text}
-        </div>
-      )}
+      <Notice notice={notice} />
 
       <Table columns={['Pedido', 'Cliente', 'Estado', 'Método', 'Total', 'Tracking', 'Fecha', '']}>
         {filtered.map((order) => {
@@ -137,7 +132,7 @@ export default function Orders() {
 
           return (
             <Fragment key={order.id}>
-              <tr key={order.id} onClick={() => setExpandedId(isOpen ? null : order.id)} className={styles.clickable}>
+              <tr onClick={() => setExpandedId(isOpen ? null : order.id)} className={styles.clickable}>
                 <td className={styles.mono}>{order.id.slice(0, 8)}</td>
                 <td>
                   <div>{order.customer_name || '—'}</div>
@@ -165,7 +160,7 @@ export default function Orders() {
               </tr>
 
               {isOpen && (
-                <tr key={`${order.id}-detail`} className={styles.detailRow}>
+                <tr className={styles.detailRow}>
                   <td colSpan={8}>
                     <OrderDetail
                       order={order}
@@ -188,7 +183,6 @@ export default function Orders() {
 
 function OrderDetail({ order, metrics, variantsById, saving, onSave, onMarkShipped }) {
   const [status, setStatus] = useState(normalizeOrderStatus(order.status))
-  const factor = orderRevenueFactor(order)
   const [carrier, setCarrier] = useState(order.carrier ?? '')
   const [tracking, setTracking] = useState(order.tracking_number ?? '')
 
@@ -203,43 +197,13 @@ function OrderDetail({ order, metrics, variantsById, saving, onSave, onMarkShipp
       <div className={styles.detailGrid}>
         <div>
           <h4 className={styles.detailTitle}>Items</h4>
-          <ul className={styles.items}>
-            {(order.order_items ?? []).map((item) => {
-              const variant = variantsById[item.product_variant_id]
-              const label = variant ? variantLabel(variant) : item.product_variant_id.slice(0, 8)
-              const image = variant?.products?.images?.[0]
-              return (
-                <li key={item.id} className={styles.item}>
-                  <span className={styles.itemMain}>
-                    {image && <img className={styles.itemThumb} src={image} alt="" loading="lazy" />}
-                    <span className={styles.itemLabel}>
-                      {label} × {item.quantity}
-                    </span>
-                  </span>
-                  <span>{formatMoney(toNumber(item.unit_price) * toNumber(item.quantity) * factor)}</span>
-                </li>
-              )
-            })}
-          </ul>
-          <div className={styles.metrics}>
-            <span>Venta: <strong>{formatMoney(metrics.venta)}</strong></span>
-            <span>Costo: <strong>{formatMoney(metrics.costo)}</strong></span>
-            <span>Cuenta: <strong>{formatMoney(metrics.cuenta)}</strong></span>
-            <span>Ganancia: <strong>{formatMoney(metrics.ganancia)}</strong></span>
-          </div>
+          <OrderItemsList order={order} variantsById={variantsById} />
+          <OrderMetrics metrics={metrics} />
         </div>
 
         <div>
           <h4 className={styles.detailTitle}>Envío</h4>
-          <ul className={styles.shipList}>
-            <li><span>Dirección</span><span>{order.shipping_address ?? '—'}</span></li>
-            <li><span>Ciudad</span><span>{order.shipping_city ?? '—'}</span></li>
-            <li><span>Provincia</span><span>{order.province ?? '—'}</span></li>
-            <li><span>Código postal</span><span>{order.shipping_postal_code ?? '—'}</span></li>
-            <li><span>Teléfono</span><span>{order.phone ?? '—'}</span></li>
-            <li><span>Envío</span><span>{shippingLabel(order.shipping_method)}</span></li>
-            <li><span>Costo envío</span><span>{formatMoney(order.shipping_cost)}</span></li>
-          </ul>
+          <ShippingInfo order={order} />
         </div>
       </div>
 

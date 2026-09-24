@@ -35,6 +35,13 @@ const icons = {
       <path d="M3.5 6.5L10 10l6.5-3.5M10 10v7" strokeLinejoin="round" />
     </svg>
   ),
+  finanzas: (
+    <svg className={styles.icon} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="3" y="5" width="14" height="11" rx="2" />
+      <path d="M3 8.5h14" strokeLinecap="round" />
+      <path d="M12.5 12.5h2" strokeLinecap="round" />
+    </svg>
+  ),
   reportes: (
     <svg className={styles.icon} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M4 15.5v-4M10 15.5v-8M16 15.5v-5" strokeLinecap="round" />
@@ -48,6 +55,7 @@ const links = [
   { to: '/pedidos', label: 'Pedidos', icon: icons.pedidos },
   { to: '/stock', label: 'Stock', icon: icons.stock },
   { to: '/productos', label: 'Productos', icon: icons.productos },
+  { to: '/finanzas', label: 'Finanzas', icon: icons.finanzas },
   { to: '/reportes', label: 'Reportes', icon: icons.reportes },
 ]
 

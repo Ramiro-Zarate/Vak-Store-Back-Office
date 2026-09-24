@@ -39,3 +39,11 @@ export const PAYMENT_METHOD_LABELS = {
   transfer: 'Transferencia',
   cash: 'Efectivo',
 }
+
+export const EXPENSE_FUNDS = ['cost', 'marketing', 'profit']
+
+export const EXPENSE_FUND_LABELS = {
+  cost: 'Costo / Reinversión',
+  marketing: 'Marketing',
+  profit: 'Ganancia',
+}

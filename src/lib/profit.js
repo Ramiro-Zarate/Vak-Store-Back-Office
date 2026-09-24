@@ -135,3 +135,31 @@ export function emptyTotals() {
     missingCost: 0,
   }
 }
+
+export const FUND_ASSIGNED_KEY = {
+  cost: 'reinversion',
+  marketing: 'marketing',
+  profit: 'ganancia',
+}
+
+export function buildFunds(orders, variantsById, costsByProduct, expenses, opts = {}) {
+  const totals = buildOrdersMetrics(orders, variantsById, costsByProduct, opts)
+
+  const funds = {}
+  for (const [fund, key] of Object.entries(FUND_ASSIGNED_KEY)) {
+    const assigned = totals[key]
+    funds[fund] = { fund, assigned, spent: 0, available: assigned }
+  }
+
+  for (const expense of expenses ?? []) {
+    const entry = funds[expense.fund]
+    if (!entry) continue
+    entry.spent += toNumber(expense.amount)
+  }
+
+  for (const entry of Object.values(funds)) {
+    entry.available = entry.assigned - entry.spent
+  }
+
+  return { funds, totals }
+}

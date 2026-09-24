@@ -1,30 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useStoreData } from '../../hooks/useStoreData'
+import { useNotice } from '../../hooks/useNotice'
 import { updateVariantStock } from '../../lib/api'
 import { formatMoney, toNumber } from '../../lib/format'
+import { variantLabel } from '../../lib/variant'
 import Card from '../../components/common/Card/Card'
 import Table from '../../components/common/Table/Table'
 import Badge from '../../components/common/Badge/Badge'
+import Notice from '../../components/common/Notice/Notice'
+import PageHeader from '../../components/common/PageHeader/PageHeader'
 import Spinner from '../../components/common/Spinner/Spinner'
 import styles from './Stock.module.css'
 
-function variantLabel(variant) {
-  const parts = [
-    variant.products?.name,
-    variant.version,
-    variant.size,
-    variant.club,
-    variant.league,
-  ].filter(Boolean)
-  return parts.join(' ')
-}
-
 export default function Stock() {
   const { variants, costsByProduct, loading, error, refresh } = useStoreData()
+  const { notice, notifySuccess, notifyError, clear } = useNotice()
   const [search, setSearch] = useState('')
   const [edits, setEdits] = useState({})
   const [savingId, setSavingId] = useState(null)
-  const [notice, setNotice] = useState({ type: '', text: '' })
 
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkText, setBulkText] = useState('')
@@ -49,21 +42,21 @@ export default function Stock() {
     const raw = edits[variant.id] ?? variant.stock_quantity
     const qty = Math.max(0, Math.round(toNumber(raw)))
     setSavingId(variant.id)
-    setNotice({ type: '', text: '' })
+    clear()
     try {
       await updateVariantStock(variant.id, qty)
       setEdits((prev) => ({ ...prev, [variant.id]: undefined }))
       await refresh()
-      setNotice({ type: 'success', text: `Stock de "${variantLabel(variant)}" actualizado a ${qty}.` })
+      notifySuccess(`Stock de "${variantLabel(variant)}" actualizado a ${qty}.`)
     } catch (err) {
-      setNotice({ type: 'error', text: err.message ?? 'Error al guardar.' })
+      notifyError(err.message ?? 'Error al guardar.')
     } finally {
       setSavingId(null)
     }
   }
 
   async function handleBulkLoad() {
-    setNotice({ type: '', text: '' })
+    clear()
     const lines = bulkText
       .split(/\r?\n/)
       .map((l) => l.trim())
@@ -100,10 +93,9 @@ export default function Stock() {
     await refresh()
     setBulkOpen(false)
     setBulkText('')
-    setNotice({
-      type: updated > 0 ? 'success' : 'error',
-      text: `${updated} actualizados de ${lines.length}. ${results.filter((r) => !r.ok).length} con error.`,
-    })
+    const summary = `${updated} actualizados de ${lines.length}. ${results.filter((r) => !r.ok).length} con error.`
+    if (updated > 0) notifySuccess(summary)
+    else notifyError(summary)
   }
 
   if (loading) return <Spinner />
@@ -114,7 +106,7 @@ export default function Stock() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>Stock</h1>
+      <PageHeader title="Stock" />
 
       <Card>
         <div className={styles.toolbar}>
@@ -153,11 +145,7 @@ export default function Stock() {
         </Card>
       )}
 
-      {notice.text && (
-        <div className={`alert ${notice.type === 'error' ? 'alert-error' : 'alert-success'}`}>
-          {notice.text}
-        </div>
-      )}
+      <Notice notice={notice} />
 
       <Table columns={['Producto', 'Variante', 'Precio', 'Stock actual', 'Nuevo stock', 'Costo cargado', '']}>
         {filtered.map(({ variant, hasCost }) => {

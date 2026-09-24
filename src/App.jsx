@@ -9,6 +9,7 @@ import Stock from './screens/Stock/Stock'
 import Products from './screens/Products/Products'
 import Reports from './screens/Reports/Reports'
 import Ventas from './screens/Ventas/Ventas'
+import Finanzas from './screens/Finanzas/Finanzas'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
               <Route path="/ventas" element={<Ventas />} />
               <Route path="/stock" element={<Stock />} />
               <Route path="/productos" element={<Products />} />
+              <Route path="/finanzas" element={<Finanzas />} />
               <Route path="/reportes" element={<Reports />} />
             </Route>
           </Route>

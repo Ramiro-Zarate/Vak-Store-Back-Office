@@ -53,6 +53,7 @@ Campos clave:
 ### Agregados por el back office (scripts en `supabase/`)
 - `migration.sql`: crea la tabla `product_costs` (`product_id` → `cost`, RLS admin) y la función `public.is_back_office_admin()` (devuelve true si el JWT es de un email admin). **Solo agrega, no toca tablas existentes.**
 - `rls_back_office.sql`: políticas RLS **aditivas** (select/insert/update para los emails admin) sobre `orders`, `order_items`, `product_variants`, `products`, `product_costs`. Habilita todas las escrituras del back office: ventas, stock, estados, **alta de productos/variantes** y costos. Correrlo en Supabase; sin esto las escrituras fallan con error de permisos. **Ya aplicado en producción.**
+- `expenses.sql`: crea la tabla `expenses` (gastos y retiros con fondo de origen) y sus políticas RLS admin (select/insert/update/delete). **Aditivo**: solo agrega, no toca ninguna tabla del ecommerce. Requiere haber corrido `migration.sql` antes.
 
 ## Reglas de negocio
 
@@ -94,34 +95,47 @@ Dashboard (KPIs + gráfica) y Reportes cuentan **únicamente** pedidos con statu
 - El alta **no pide imágenes**: la columna `products.images` se carga por Supabase/BD.
 - La variante nueva aparece al instante en Stock (para ajustar stock) y en Ventas (para venderla). El costo se asigna después en Productos (columna "Costo (ARS)").
 
+### Gastos y finanzas (pantalla Finanzas)
+- Registra **movimientos** (gastos y retiros) en la tabla `expenses`: `concept`, `category` (texto libre), `fund` (`cost` | `marketing` | `profit`), `amount`, `spent_at`, `notes`.
+- Cada movimiento se descuenta de un **fondo de origen**, calculado en vivo desde las ventas cobradas (`buildFunds` en `src/lib/profit.js`):
+  - **Costo / Reinversión** = `reinversion` (costo + 15% cuenta) − movimientos con `fund = cost`.
+  - **Marketing** = `marketing` (30% cuenta) − movimientos con `fund = marketing`.
+  - **Ganancia** = `ganancia` (55% cuenta) − movimientos/retiros con `fund = profit`.
+- Botón **"Retirar ganancia"**: precarga el form con `fund = profit` y el saldo disponible, dejando el fondo en 0 (o en lo que reste si se edita el monto).
+- Los gastos **no** modifican el split 55/30/15 ni la ganancia: solo reducen el saldo disponible del fondo elegido. Se reflejan también en Reportes (saldos por fondo + export CSV).
+- Requiere `supabase/expenses.sql` corrido en Supabase.
+
 ## Arquitectura
 
 ```
 src/
   main.jsx / App.jsx           # entry + rutas
   supabaseClient.js            # cliente Supabase (leyendo .env)
-  config/constants.js          # porcentajes, status, métodos de pago, emails admin
+  config/constants.js          # porcentajes, status, métodos de pago, fondos de gasto, emails admin
   context/auth.js              # AuthContext + useAuth (hook)
   context/AuthContext.jsx      # AuthProvider (solo el componente)
   hooks/
     useStoreData.js            # orders + variants + costs (compartido)
     useProducts.js
     useShippingMethods.js
+    useExpenses.js             # movimientos de gastos/retiros
+    useNotice.js               # notice (success/error) reutilizable
   lib/
     api.js                     # queries/escrituras a Supabase
-    profit.js                  # splitProfit, buildOrderItemMetrics, buildProductReport
+    profit.js                  # splitProfit, buildOrdersMetrics, buildProductReport, buildFunds
     format.js                  # formatMoney, formatDate, toNumber
     orders.js                  # isPaidOrder, isManualOrder, shipping labels
-    variant.js                 # variantLabel(variant)
+    variant.js                 # variantLabel / variantShortLabel
   components/
-    common/                    # Card, Table, Badge, Modal, Spinner, StatusBadge (cada uno con su .module.css)
+    common/                    # Card, Table, Badge, Modal, Spinner, StatusBadge, Notice, PageHeader,
+                               # DateRangeFilter, Kpi (KpiGrid/KpiCard), OrderDetail (items/métricas/envío)
     Layout/                    # sidebar + topbar + íconos inline SVG
     ProtectedRoute/            # gate de auth + lista blanca
     Login/
-  screens/                     # Dashboard, Ventas (+NewSaleForm), Orders, Stock, Products, Reports
+  screens/                     # Dashboard, Ventas (+NewSaleForm), Orders, Stock, Products, Finanzas (+ExpenseForm), Reports
 ```
 
-Rutas: `/login` → `/` (Dashboard), `/ventas`, `/pedidos`, `/stock`, `/productos`, `/reportes`.
+Rutas: `/login` → `/` (Dashboard), `/ventas`, `/pedidos`, `/stock`, `/productos`, `/finanzas`, `/reportes`.
 
 ## Convenciones y gotchas
 
@@ -139,6 +153,7 @@ Rutas: `/login` → `/` (Dashboard), `/ventas`, `/pedidos`, `/stock`, `/producto
 3. En el panel de Supabase: crear los 2 usuarios en `Authentication → Users`, habilitar Email auth (opcional: desactivar "Confirm email" para login directo).
 4. Correr `supabase/migration.sql` en el SQL Editor (verificar/actualizar los emails admin de la función `is_back_office_admin`).
 5. Para poder escribir (ventas/stock/estados/altas): correr `supabase/rls_back_office.sql`.
+6. Para la sección Finanzas (gastos/retiros): correr `supabase/expenses.sql`.
 
 ## Deploy (Vercel, en producción)
 
